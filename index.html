@@ -65,18 +65,13 @@ body {
 }
 
 .player {
-  width: 100%;
-  height: 100%;
+  width: 325px;
+  height: 575px;
 
-  max-width: 605px;
+  border: none;
+  border-radius: 12px;
 
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.player blockquote {
-  margin: 0 !important;
+  overflow: hidden;
 }
 
 .info {
@@ -186,16 +181,12 @@ async function loadFeed() {
       !data.success ||
       !Array.isArray(data.videos)
     ) {
-
       throw new Error(
         "Invalid feed response."
       );
     }
 
-    if (
-      data.videos.length === 0
-    ) {
-
+    if (data.videos.length === 0) {
       throw new Error(
         "No videos were returned."
       );
@@ -203,18 +194,11 @@ async function loadFeed() {
 
     feed.innerHTML = "";
 
-    for (
-      const video of data.videos
-    ) {
-
+    for (const video of data.videos) {
       createVideo(video);
     }
 
-    loadTikTok();
-
-    loading.classList.add(
-      "hidden"
-    );
+    loading.classList.add("hidden");
 
   } catch (error) {
 
@@ -234,139 +218,93 @@ async function loadFeed() {
 function createVideo(video) {
 
   const section =
-    document.createElement(
-      "section"
-    );
+    document.createElement("section");
 
-  section.className =
-    "video";
+  section.className = "video";
 
   /*
-   * Use the embed HTML returned
-   * directly by TikTok.
+   * Use an iframe with the direct
+   * TikTok embed URL — far more
+   * reliable than the blockquote
+   * + embed.js widget approach.
    */
 
-  const player =
-    document.createElement(
-      "div"
+  if (video.embedLink) {
+
+    const iframe =
+      document.createElement("iframe");
+
+    iframe.className = "player";
+
+    iframe.src = video.embedLink;
+
+    iframe.setAttribute(
+      "allow",
+      "autoplay; clipboard-write; encrypted-media; picture-in-picture;"
     );
 
-  player.className =
-    "player";
+    iframe.setAttribute(
+      "allowfullscreen",
+      ""
+    );
 
-  player.innerHTML =
-    video.embedHTML || "";
+    iframe.setAttribute(
+      "loading",
+      "lazy"
+    );
+
+    section.appendChild(iframe);
+
+  } else {
+
+    /*
+     * Fallback: no embed available.
+     */
+
+    const fallback =
+      document.createElement("div");
+
+    fallback.style.cssText =
+      "color:#888; font-size:14px;";
+
+    fallback.textContent =
+      "Video unavailable";
+
+    section.appendChild(fallback);
+  }
 
   /*
    * Metadata overlay.
    */
 
   const info =
-    document.createElement(
-      "div"
-    );
+    document.createElement("div");
 
-  info.className =
-    "info";
+  info.className = "info";
 
   info.innerHTML = `
     <div class="creator">
-      @${escapeHTML(
-        video.author || "Unknown"
-      )}
+      @${escapeHTML(video.author || "Unknown")}
     </div>
-
     <div class="title">
-      ${escapeHTML(
-        video.title || ""
-      )}
+      ${escapeHTML(video.title || "")}
     </div>
   `;
 
-  section.appendChild(
-    player
-  );
+  section.appendChild(info);
 
-  section.appendChild(
-    info
-  );
-
-  feed.appendChild(
-    section
-  );
-}
-
-
-function loadTikTok() {
-
-  const script =
-    document.createElement(
-      "script"
-    );
-
-  script.src =
-    "https://www.tiktok.com/embed.js";
-
-  script.async = true;
-
-  script.onload = () => {
-
-    console.log(
-      "TikTok embed script loaded."
-    );
-
-    /*
-     * Force TikTok to scan the page
-     * after the dynamically-created
-     * blockquotes are inserted.
-     */
-
-    if (
-      window.tiktokEmbed &&
-      window.tiktokEmbed.lib
-    ) {
-
-      window.tiktokEmbed.lib.render();
-    }
-  };
-
-  script.onerror = () => {
-
-    console.error(
-      "TikTok embed.js failed."
-    );
-
-  };
-
-  document.body.appendChild(
-    script
-  );
+  feed.appendChild(section);
 }
 
 
 function escapeHTML(value) {
 
   return String(value)
-    .replaceAll(
-      "&",
-      "&amp;"
-    )
-    .replaceAll(
-      "<",
-      "&lt;"
-    )
-    .replaceAll(
-      ">",
-      "&gt;"
-    )
-    .replaceAll(
-      '"',
-      "&quot;"
-    )
-    .replaceAll(
-      "'",
-      "&#039;"
-    );
+    .replaceAll("&",  "&amp;")
+    .replaceAll("<",  "&lt;")
+    .replaceAll(">",  "&gt;")
+    .replaceAll('"',  "&quot;")
+    .replaceAll("'",  "&#039;");
 }
 
 
