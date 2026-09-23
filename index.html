@@ -2,6 +2,7 @@
 <html lang="en">
 
 <head>
+
 <meta charset="UTF-8">
 
 <meta
@@ -9,7 +10,7 @@
   content="width=device-width, initial-scale=1.0"
 >
 
-<title>TikTok Feed</title>
+<title>Video Feed</title>
 
 <style>
 
@@ -20,13 +21,11 @@
 html,
 body {
   margin: 0;
-  padding: 0;
-
   width: 100%;
   height: 100%;
 
   background: #000;
-  color: #fff;
+  color: white;
 
   font-family: Arial, sans-serif;
 }
@@ -51,27 +50,63 @@ body {
 }
 
 .video {
+  position: relative;
+
   width: 100%;
   height: 100vh;
 
   scroll-snap-align: start;
 
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
   background: #000;
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
-.video iframe {
-  border: none;
+.player {
+  width: 100%;
+  height: 100%;
+
+  max-width: 605px;
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
-.error {
-  text-align: center;
-  padding: 30px;
+.player blockquote {
+  margin: 0 !important;
+}
 
-  color: #ff7070;
+.info {
+  position: absolute;
+
+  left: 20px;
+  bottom: 35px;
+
+  z-index: 10;
+
+  max-width: 450px;
+
+  text-shadow:
+    0 1px 5px black,
+    0 1px 10px black;
+}
+
+.creator {
+  font-weight: bold;
+  font-size: 17px;
+
+  margin-bottom: 8px;
+}
+
+.title {
+  font-size: 14px;
+
+  line-height: 1.4;
+
+  color: #eee;
 }
 
 .loading {
@@ -79,31 +114,41 @@ body {
 
   inset: 0;
 
+  z-index: 100;
+
   display: flex;
   align-items: center;
   justify-content: center;
 
   background: #000;
-
-  z-index: 999;
-
-  font-size: 18px;
 }
 
 .loading.hidden {
   display: none;
 }
 
+.error {
+  text-align: center;
+
+  color: #ff7777;
+
+  padding: 30px;
+}
+
 </style>
+
 </head>
 
 <body>
 
-<div id="loading" class="loading">
-  Loading...
+<div
+  id="loading"
+  class="loading"
+>
+  Loading videos...
 </div>
 
-<div id="feed"></div>
+<main id="feed"></main>
 
 <script>
 
@@ -121,103 +166,51 @@ async function loadFeed() {
 
   try {
 
-    const response = await fetch(
-      WORKER + "/api/feed",
-      {
-        cache: "no-store"
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(
-        "Worker returned HTTP " +
-        response.status
+    const response =
+      await fetch(
+        WORKER + "/api/feed",
+        {
+          cache: "no-store"
+        }
       );
-    }
 
     const data =
       await response.json();
 
     console.log(
-      "Feed response:",
+      "Worker data:",
       data
     );
 
-    if (!data.success) {
+    if (
+      !data.success ||
+      !Array.isArray(data.videos)
+    ) {
+
       throw new Error(
-        "Worker reported an error."
+        "Invalid feed response."
       );
     }
 
-    if (!data.videos.length) {
+    if (
+      data.videos.length === 0
+    ) {
+
       throw new Error(
-        "Worker returned no videos."
+        "No videos were returned."
       );
     }
 
     feed.innerHTML = "";
 
-    let loaded = 0;
+    for (
+      const video of data.videos
+    ) {
 
-    for (const video of data.videos) {
-
-      if (
-        !video.success ||
-        !video.html
-      ) {
-
-        console.warn(
-          "Video failed:",
-          video
-        );
-
-        continue;
-      }
-
-      const section =
-        document.createElement(
-          "section"
-        );
-
-      section.className =
-        "video";
-
-      section.innerHTML =
-        video.html;
-
-      feed.appendChild(
-        section
-      );
-
-      loaded++;
+      createVideo(video);
     }
 
-    if (loaded === 0) {
-
-      throw new Error(
-        "TikTok did not return any embeddable videos."
-      );
-    }
-
-    /*
-     * TikTok's returned oEmbed HTML
-     * references this script.
-     *
-     * It must be added after the
-     * embed HTML is inserted.
-     */
-
-    const script =
-      document.createElement("script");
-
-    script.src =
-      "https://www.tiktok.com/embed.js";
-
-    script.async = true;
-
-    document.body.appendChild(
-      script
-    );
+    loadTikTok();
 
     loading.classList.add(
       "hidden"
@@ -229,7 +222,7 @@ async function loadFeed() {
 
     loading.innerHTML = `
       <div class="error">
-        <b>Feed failed to load</b>
+        <b>Unable to load videos</b>
         <br><br>
         ${escapeHTML(error.message)}
       </div>
@@ -238,14 +231,142 @@ async function loadFeed() {
 }
 
 
-function escapeHTML(text) {
+function createVideo(video) {
 
-  return String(text)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
+  const section =
+    document.createElement(
+      "section"
+    );
+
+  section.className =
+    "video";
+
+  /*
+   * Use the embed HTML returned
+   * directly by TikTok.
+   */
+
+  const player =
+    document.createElement(
+      "div"
+    );
+
+  player.className =
+    "player";
+
+  player.innerHTML =
+    video.embedHTML || "";
+
+  /*
+   * Metadata overlay.
+   */
+
+  const info =
+    document.createElement(
+      "div"
+    );
+
+  info.className =
+    "info";
+
+  info.innerHTML = `
+    <div class="creator">
+      @${escapeHTML(
+        video.author || "Unknown"
+      )}
+    </div>
+
+    <div class="title">
+      ${escapeHTML(
+        video.title || ""
+      )}
+    </div>
+  `;
+
+  section.appendChild(
+    player
+  );
+
+  section.appendChild(
+    info
+  );
+
+  feed.appendChild(
+    section
+  );
+}
+
+
+function loadTikTok() {
+
+  const script =
+    document.createElement(
+      "script"
+    );
+
+  script.src =
+    "https://www.tiktok.com/embed.js";
+
+  script.async = true;
+
+  script.onload = () => {
+
+    console.log(
+      "TikTok embed script loaded."
+    );
+
+    /*
+     * Force TikTok to scan the page
+     * after the dynamically-created
+     * blockquotes are inserted.
+     */
+
+    if (
+      window.tiktokEmbed &&
+      window.tiktokEmbed.lib
+    ) {
+
+      window.tiktokEmbed.lib.render();
+    }
+  };
+
+  script.onerror = () => {
+
+    console.error(
+      "TikTok embed.js failed."
+    );
+
+  };
+
+  document.body.appendChild(
+    script
+  );
+}
+
+
+function escapeHTML(value) {
+
+  return String(value)
+    .replaceAll(
+      "&",
+      "&amp;"
+    )
+    .replaceAll(
+      "<",
+      "&lt;"
+    )
+    .replaceAll(
+      ">",
+      "&gt;"
+    )
+    .replaceAll(
+      '"',
+      "&quot;"
+    )
+    .replaceAll(
+      "'",
+      "&#039;"
+    );
 }
 
 
@@ -254,4 +375,5 @@ loadFeed();
 </script>
 
 </body>
+
 </html>
