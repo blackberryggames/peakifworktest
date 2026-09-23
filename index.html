@@ -1,13 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
 <meta charset="UTF-8">
+
 <meta
   name="viewport"
-  content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+  content="width=device-width, initial-scale=1.0"
 >
 
-<title>Video Feed</title>
+<title>TikTok Feed</title>
 
 <style>
 
@@ -19,12 +21,18 @@ html,
 body {
   margin: 0;
   padding: 0;
+
   width: 100%;
   height: 100%;
-  overflow: hidden;
+
   background: #000;
-  color: white;
-  font-family: Arial, Helvetica, sans-serif;
+  color: #fff;
+
+  font-family: Arial, sans-serif;
+}
+
+body {
+  overflow: hidden;
 }
 
 #feed {
@@ -32,7 +40,6 @@ body {
   height: 100vh;
 
   overflow-y: auto;
-  overflow-x: hidden;
 
   scroll-snap-type: y mandatory;
 
@@ -44,13 +51,10 @@ body {
 }
 
 .video {
-  position: relative;
-
   width: 100%;
   height: 100vh;
 
   scroll-snap-align: start;
-  scroll-snap-stop: always;
 
   display: flex;
   align-items: center;
@@ -59,49 +63,15 @@ body {
   background: #000;
 }
 
-.embed {
-  width: min(100%, 605px);
-  height: 100%;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.video iframe {
+  border: none;
 }
 
-.embed iframe {
-  border: 0;
-  width: 100%;
-  height: 100%;
-}
+.error {
+  text-align: center;
+  padding: 30px;
 
-.topbar {
-  position: fixed;
-
-  top: 0;
-  left: 0;
-
-  width: 100%;
-
-  height: 60px;
-
-  z-index: 100;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  pointer-events: none;
-
-  background: linear-gradient(
-    to bottom,
-    rgba(0,0,0,.5),
-    transparent
-  );
-}
-
-.logo {
-  font-size: 20px;
-  font-weight: 700;
+  color: #ff7070;
 }
 
 .loading {
@@ -115,19 +85,13 @@ body {
 
   background: #000;
 
-  z-index: 200;
+  z-index: 999;
 
-  font-size: 16px;
+  font-size: 18px;
 }
 
 .loading.hidden {
   display: none;
-}
-
-.error {
-  color: #ff7777;
-  text-align: center;
-  padding: 30px;
 }
 
 </style>
@@ -135,17 +99,11 @@ body {
 
 <body>
 
-<div class="loading" id="loading">
+<div id="loading" class="loading">
   Loading...
 </div>
 
-<div class="topbar">
-  <div class="logo">
-    Video Feed
-  </div>
-</div>
-
-<main id="feed"></main>
+<div id="feed"></div>
 
 <script>
 
@@ -164,7 +122,7 @@ async function loadFeed() {
   try {
 
     const response = await fetch(
-      `${WORKER}/api/feed`,
+      WORKER + "/api/feed",
       {
         cache: "no-store"
       }
@@ -172,49 +130,98 @@ async function loadFeed() {
 
     if (!response.ok) {
       throw new Error(
-        `Worker returned ${response.status}`
+        "Worker returned HTTP " +
+        response.status
       );
     }
 
     const data =
       await response.json();
 
-    if (
-      !data.success ||
-      !Array.isArray(data.videos)
-    ) {
+    console.log(
+      "Feed response:",
+      data
+    );
+
+    if (!data.success) {
       throw new Error(
-        "Invalid feed response."
+        "Worker reported an error."
       );
     }
 
-    if (data.videos.length === 0) {
-
+    if (!data.videos.length) {
       throw new Error(
-        "The feed is empty."
+        "Worker returned no videos."
       );
     }
 
     feed.innerHTML = "";
 
-    for (
-      let i = 0;
-      i < data.videos.length;
-      i++
-    ) {
+    let loaded = 0;
 
-      const url =
-        data.videos[i];
+    for (const video of data.videos) {
 
-      const video =
-        createVideo(url, i);
+      if (
+        !video.success ||
+        !video.html
+      ) {
 
-      feed.appendChild(video);
+        console.warn(
+          "Video failed:",
+          video
+        );
+
+        continue;
+      }
+
+      const section =
+        document.createElement(
+          "section"
+        );
+
+      section.className =
+        "video";
+
+      section.innerHTML =
+        video.html;
+
+      feed.appendChild(
+        section
+      );
+
+      loaded++;
     }
 
-    loadTikTokScript();
+    if (loaded === 0) {
 
-    loading.classList.add("hidden");
+      throw new Error(
+        "TikTok did not return any embeddable videos."
+      );
+    }
+
+    /*
+     * TikTok's returned oEmbed HTML
+     * references this script.
+     *
+     * It must be added after the
+     * embed HTML is inserted.
+     */
+
+    const script =
+      document.createElement("script");
+
+    script.src =
+      "https://www.tiktok.com/embed.js";
+
+    script.async = true;
+
+    document.body.appendChild(
+      script
+    );
+
+    loading.classList.add(
+      "hidden"
+    );
 
   } catch (error) {
 
@@ -222,7 +229,8 @@ async function loadFeed() {
 
     loading.innerHTML = `
       <div class="error">
-        Failed to load feed.<br><br>
+        <b>Feed failed to load</b>
+        <br><br>
         ${escapeHTML(error.message)}
       </div>
     `;
@@ -230,131 +238,9 @@ async function loadFeed() {
 }
 
 
-function createVideo(url, index) {
+function escapeHTML(text) {
 
-  const section =
-    document.createElement("section");
-
-  section.className = "video";
-
-  const embed =
-    document.createElement("div");
-
-  embed.className = "embed";
-
-  /*
-   * TikTok's official blockquote format.
-   *
-   * We extract the video ID from the URL.
-   */
-
-  const videoId =
-    extractVideoId(url);
-
-  if (!videoId) {
-
-    embed.innerHTML = `
-      <div class="error">
-        Invalid TikTok video URL.
-      </div>
-    `;
-
-  } else {
-
-    const blockquote =
-      document.createElement("blockquote");
-
-    blockquote.className =
-      "tiktok-embed";
-
-    blockquote.setAttribute(
-      "cite",
-      url
-    );
-
-    blockquote.setAttribute(
-      "data-video-id",
-      videoId
-    );
-
-    blockquote.style.maxWidth =
-      "605px";
-
-    blockquote.style.minWidth =
-      "325px";
-
-    const sectionElement =
-      document.createElement("section");
-
-    blockquote.appendChild(
-      sectionElement
-    );
-
-    embed.appendChild(
-      blockquote
-    );
-  }
-
-  section.appendChild(embed);
-
-  return section;
-}
-
-
-function extractVideoId(url) {
-
-  try {
-
-    const parsed =
-      new URL(url);
-
-    const match =
-      parsed.pathname.match(
-        /\/video\/(\d+)/
-      );
-
-    return match
-      ? match[1]
-      : null;
-
-  } catch {
-
-    return null;
-  }
-}
-
-
-function loadTikTokScript() {
-
-  const existing =
-    document.getElementById(
-      "tiktok-script"
-    );
-
-  if (existing) {
-    return;
-  }
-
-  const script =
-    document.createElement("script");
-
-  script.id =
-    "tiktok-script";
-
-  script.src =
-    "https://www.tiktok.com/embed.js";
-
-  script.async = true;
-
-  document.body.appendChild(
-    script
-  );
-}
-
-
-function escapeHTML(value) {
-
-  return String(value)
+  return String(text)
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
