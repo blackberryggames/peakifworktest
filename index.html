@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta
+  name="viewport"
+  content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+>
+
+<title>Video Feed</title>
+
+<style>
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #000;
+  color: white;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+#feed {
+  width: 100%;
+  height: 100vh;
+
+  overflow-y: auto;
+  overflow-x: hidden;
+
+  scroll-snap-type: y mandatory;
+
+  scrollbar-width: none;
+}
+
+#feed::-webkit-scrollbar {
+  display: none;
+}
+
+.video {
+  position: relative;
+
+  width: 100%;
+  height: 100vh;
+
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: #000;
+}
+
+.embed {
+  width: min(100%, 605px);
+  height: 100%;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.embed iframe {
+  border: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.topbar {
+  position: fixed;
+
+  top: 0;
+  left: 0;
+
+  width: 100%;
+
+  height: 60px;
+
+  z-index: 100;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  pointer-events: none;
+
+  background: linear-gradient(
+    to bottom,
+    rgba(0,0,0,.5),
+    transparent
+  );
+}
+
+.logo {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.loading {
+  position: fixed;
+
+  inset: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: #000;
+
+  z-index: 200;
+
+  font-size: 16px;
+}
+
+.loading.hidden {
+  display: none;
+}
+
+.error {
+  color: #ff7777;
+  text-align: center;
+  padding: 30px;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="loading" id="loading">
+  Loading...
+</div>
+
+<div class="topbar">
+  <div class="logo">
+    Video Feed
+  </div>
+</div>
+
+<main id="feed"></main>
+
+<script>
+
+const WORKER =
+  "https://muddy-field-9826.blackberryggames.workers.dev";
+
+const feed =
+  document.getElementById("feed");
+
+const loading =
+  document.getElementById("loading");
+
+
+async function loadFeed() {
+
+  try {
+
+    const response = await fetch(
+      `${WORKER}/api/feed`,
+      {
+        cache: "no-store"
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        `Worker returned ${response.status}`
+      );
+    }
+
+    const data =
+      await response.json();
+
+    if (
+      !data.success ||
+      !Array.isArray(data.videos)
+    ) {
+      throw new Error(
+        "Invalid feed response."
+      );
+    }
+
+    if (data.videos.length === 0) {
+
+      throw new Error(
+        "The feed is empty."
+      );
+    }
+
+    feed.innerHTML = "";
+
+    for (
+      let i = 0;
+      i < data.videos.length;
+      i++
+    ) {
+
+      const url =
+        data.videos[i];
+
+      const video =
+        createVideo(url, i);
+
+      feed.appendChild(video);
+    }
+
+    loadTikTokScript();
+
+    loading.classList.add("hidden");
+
+  } catch (error) {
+
+    console.error(error);
+
+    loading.innerHTML = `
+      <div class="error">
+        Failed to load feed.<br><br>
+        ${escapeHTML(error.message)}
+      </div>
+    `;
+  }
+}
+
+
+function createVideo(url, index) {
+
+  const section =
+    document.createElement("section");
+
+  section.className = "video";
+
+  const embed =
+    document.createElement("div");
+
+  embed.className = "embed";
+
+  /*
+   * TikTok's official blockquote format.
+   *
+   * We extract the video ID from the URL.
+   */
+
+  const videoId =
+    extractVideoId(url);
+
+  if (!videoId) {
+
+    embed.innerHTML = `
+      <div class="error">
+        Invalid TikTok video URL.
+      </div>
+    `;
+
+  } else {
+
+    const blockquote =
+      document.createElement("blockquote");
+
+    blockquote.className =
+      "tiktok-embed";
+
+    blockquote.setAttribute(
+      "cite",
+      url
+    );
+
+    blockquote.setAttribute(
+      "data-video-id",
+      videoId
+    );
+
+    blockquote.style.maxWidth =
+      "605px";
+
+    blockquote.style.minWidth =
+      "325px";
+
+    const sectionElement =
+      document.createElement("section");
+
+    blockquote.appendChild(
+      sectionElement
+    );
+
+    embed.appendChild(
+      blockquote
+    );
+  }
+
+  section.appendChild(embed);
+
+  return section;
+}
+
+
+function extractVideoId(url) {
+
+  try {
+
+    const parsed =
+      new URL(url);
+
+    const match =
+      parsed.pathname.match(
+        /\/video\/(\d+)/
+      );
+
+    return match
+      ? match[1]
+      : null;
+
+  } catch {
+
+    return null;
+  }
+}
+
+
+function loadTikTokScript() {
+
+  const existing =
+    document.getElementById(
+      "tiktok-script"
+    );
+
+  if (existing) {
+    return;
+  }
+
+  const script =
+    document.createElement("script");
+
+  script.id =
+    "tiktok-script";
+
+  script.src =
+    "https://www.tiktok.com/embed.js";
+
+  script.async = true;
+
+  document.body.appendChild(
+    script
+  );
+}
+
+
+function escapeHTML(value) {
+
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+
+loadFeed();
+
+</script>
+
+</body>
+</html>
