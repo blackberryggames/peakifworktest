@@ -1,317 +1,567 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
 
 <meta charset="UTF-8">
-
-<meta
-  name="viewport"
-  content="width=device-width, initial-scale=1.0"
->
-
-<title>Video Feed</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Feed</title>
 
 <style>
 
-* {
+:root {
+  --bg:        #000;
+  --surface:   #111;
+  --text:      #fff;
+  --muted:     #aaa;
+  --accent:    #fe2c55; /* TikTok red */
+  --radius:    14px;
+  --safe-top:  env(safe-area-inset-top, 0px);
+  --safe-bot:  env(safe-area-inset-bottom, 0px);
+
   box-sizing: border-box;
 }
 
-html,
-body {
+*, *::before, *::after {
+  box-sizing: inherit;
   margin: 0;
+  padding: 0;
+}
+
+html, body {
   width: 100%;
   height: 100%;
-
-  background: #000;
-  color: white;
-
-  font-family: Arial, sans-serif;
-}
-
-body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   overflow: hidden;
 }
+
+/* ── Top bar ─────────────────────────────── */
+
+#topbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  padding-top: var(--safe-top);
+  background: linear-gradient(to bottom, rgba(0,0,0,.72) 0%, transparent 100%);
+  pointer-events: none;
+}
+
+#topbar-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 52px;
+  gap: 24px;
+}
+
+.tab {
+  font-size: 16px;
+  font-weight: 600;
+  color: rgba(255,255,255,.5);
+  letter-spacing: .01em;
+  pointer-events: auto;
+  cursor: pointer;
+  transition: color .15s;
+}
+
+.tab.active {
+  color: #fff;
+  border-bottom: 2px solid #fff;
+  padding-bottom: 2px;
+}
+
+/* ── Feed scroller ───────────────────────── */
 
 #feed {
   width: 100%;
   height: 100vh;
-
-  overflow-y: auto;
-
+  overflow-y: scroll;
   scroll-snap-type: y mandatory;
-
   scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  padding-top: var(--safe-top);
+  padding-bottom: var(--safe-bot);
 }
 
-#feed::-webkit-scrollbar {
-  display: none;
-}
+#feed::-webkit-scrollbar { display: none; }
 
-.video {
+/* ── Video slide ─────────────────────────── */
+
+.slide {
   position: relative;
-
   width: 100%;
   height: 100vh;
-
   scroll-snap-align: start;
-
-  background: #000;
-
   display: flex;
-  justify-content: center;
   align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  flex-shrink: 0;
 }
 
-.player {
-  width: 325px;
-  height: 576px;
+/* ── TikTok embed iframe ─────────────────── */
 
-  border: none;
-  border-radius: 12px;
-
+.player-wrap {
+  width: min(325px, 90vw);
+  height: min(576px, calc(90vw * (576/325)));
+  border-radius: var(--radius);
   overflow: hidden;
+  position: relative;
+  box-shadow: 0 8px 40px rgba(0,0,0,.6);
 }
+
+.player-wrap iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  display: block;
+}
+
+/* Loading shimmer inside the iframe slot */
+.player-wrap::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    110deg,
+    #1a1a1a 25%,
+    #2a2a2a 50%,
+    #1a1a1a 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+  border-radius: var(--radius);
+  z-index: -1;
+}
+
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ── Right-side action buttons ───────────── */
+
+.actions {
+  position: absolute;
+  right: 14px;
+  bottom: 100px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  z-index: 10;
+}
+
+.action-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.action-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(255,255,255,.12);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  transition: background .12s, transform .1s;
+  border: 1px solid rgba(255,255,255,.08);
+}
+
+.action-btn:active .action-icon {
+  background: rgba(255,255,255,.22);
+  transform: scale(.92);
+}
+
+.action-btn.liked .action-icon {
+  color: var(--accent);
+}
+
+.action-label {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+/* Avatar circle */
+.avatar {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 17px;
+  text-transform: uppercase;
+  color: #fff;
+  margin-bottom: 2px;
+}
+
+/* ── Bottom info overlay ─────────────────── */
 
 .info {
   position: absolute;
-
-  left: 20px;
-  bottom: 35px;
-
+  left: 16px;
+  bottom: 32px;
+  right: 70px;
   z-index: 10;
-
-  max-width: 450px;
-
-  text-shadow:
-    0 1px 5px black,
-    0 1px 10px black;
+  text-shadow: 0 1px 6px rgba(0,0,0,.8), 0 2px 14px rgba(0,0,0,.5);
 }
 
-.creator {
-  font-weight: bold;
-  font-size: 17px;
-
-  margin-bottom: 8px;
-}
-
-.title {
-  font-size: 14px;
-
-  line-height: 1.4;
-
-  color: #eee;
-}
-
-.loading {
-  position: fixed;
-
-  inset: 0;
-
-  z-index: 100;
-
+.info-author {
+  font-weight: 700;
+  font-size: 15px;
+  margin-bottom: 6px;
   display: flex;
   align-items: center;
+  gap: 6px;
+}
+
+.verified {
+  color: #20d5ec;
+  font-size: 13px;
+}
+
+.info-title {
+  font-size: 13px;
+  color: #ddd;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.info-music {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* ── Loading / error screens ─────────────── */
+
+#screen {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
-
-  background: #000;
+  gap: 16px;
+  background: var(--bg);
 }
 
-.loading.hidden {
-  display: none;
+#screen.hidden { display: none; }
+
+.spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid rgba(255,255,255,.15);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .75s linear infinite;
 }
 
-.error {
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.screen-label {
+  font-size: 14px;
+  color: var(--muted);
+  letter-spacing: .02em;
+}
+
+.error-icon { font-size: 40px; }
+
+.error-msg {
+  font-size: 14px;
+  color: #ff7070;
   text-align: center;
+  max-width: 280px;
+  line-height: 1.5;
+}
 
-  color: #ff7777;
+.retry-btn {
+  margin-top: 8px;
+  padding: 10px 24px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity .15s;
+}
 
-  padding: 30px;
+.retry-btn:hover { opacity: .85; }
+
+/* ── Progress dots ───────────────────────── */
+
+#dots {
+  position: fixed;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: rgba(255,255,255,.3);
+  transition: background .2s, transform .2s;
+}
+
+.dot.active {
+  background: #fff;
+  transform: scale(1.7);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner, .shimmer { animation: none; }
 }
 
 </style>
-
 </head>
-
 <body>
 
-<div
-  id="loading"
-  class="loading"
->
-  Loading videos...
+<!-- Top nav bar -->
+<header id="topbar">
+  <div id="topbar-inner">
+    <span class="tab">Following</span>
+    <span class="tab active">For You</span>
+    <span class="tab">Explore</span>
+  </div>
+</header>
+
+<!-- Loading / error overlay -->
+<div id="screen">
+  <div class="spinner"></div>
+  <span class="screen-label">Loading feed…</span>
 </div>
 
+<!-- Progress dots -->
+<div id="dots"></div>
+
+<!-- Main scrollable feed -->
 <main id="feed"></main>
 
 <script>
 
-const WORKER =
-  "https://muddy-field-9826.blackberryggames.workers.dev";
+// ─── Config ──────────────────────────────────────────
+const WORKER = "https://muddy-field-9826.blackberryggames.workers.dev";
 
-const feed =
-  document.getElementById("feed");
+// ─── State ───────────────────────────────────────────
+let currentIndex = 0;
+let totalVideos   = 0;
+let dots          = [];
 
-const loading =
-  document.getElementById("loading");
+const feed   = document.getElementById("feed");
+const screen = document.getElementById("screen");
+const dotsEl = document.getElementById("dots");
 
+// ─── Helpers ─────────────────────────────────────────
+
+function esc(str) {
+  return String(str ?? "")
+    .replace(/&/g,  "&amp;")
+    .replace(/</g,  "&lt;")
+    .replace(/>/g,  "&gt;")
+    .replace(/"/g,  "&quot;")
+    .replace(/'/g,  "&#039;");
+}
+
+function initials(name) {
+  return (name || "?").slice(0, 1).toUpperCase();
+}
+
+function fmtCount(n) {
+  if (!n) return "0";
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
+  if (n >= 1_000)     return (n / 1_000).toFixed(1) + "K";
+  return String(n);
+}
+
+function randomCount(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+// ─── Build a slide ───────────────────────────────────
+
+function buildSlide(video, index) {
+  const section = document.createElement("section");
+  section.className = "slide";
+  section.dataset.index = index;
+
+  const likes    = randomCount(12_000, 2_400_000);
+  const comments = randomCount(800,    95_000);
+  const shares   = randomCount(200,    40_000);
+
+  section.innerHTML = `
+    <!-- iframe player -->
+    <div class="player-wrap">
+      <iframe
+        src="${esc(video.embedLink)}"
+        allow="autoplay; clipboard-write; encrypted-media; picture-in-picture;"
+        allowfullscreen
+        loading="lazy"
+      ></iframe>
+    </div>
+
+    <!-- right-side actions -->
+    <aside class="actions">
+      <div class="action-btn" data-action="profile">
+        <div class="avatar">${esc(initials(video.author))}</div>
+      </div>
+
+      <div class="action-btn" data-action="like">
+        <div class="action-icon">❤️</div>
+        <span class="action-label">${fmtCount(likes)}</span>
+      </div>
+
+      <div class="action-btn" data-action="comment">
+        <div class="action-icon">💬</div>
+        <span class="action-label">${fmtCount(comments)}</span>
+      </div>
+
+      <div class="action-btn" data-action="share">
+        <div class="action-icon">↗️</div>
+        <span class="action-label">${fmtCount(shares)}</span>
+      </div>
+
+      <div class="action-btn" data-action="more">
+        <div class="action-icon">···</div>
+      </div>
+    </aside>
+
+    <!-- bottom metadata -->
+    <div class="info">
+      <div class="info-author">
+        @${esc(video.author || "creator")}
+        <span class="verified">✓</span>
+      </div>
+      <div class="info-title">${esc(video.title || "Watch this 👇")}</div>
+      <div class="info-music">
+        🎵 original sound – ${esc(video.author || "creator")}
+      </div>
+    </div>
+  `;
+
+  // Like toggle
+  section.querySelectorAll("[data-action='like']").forEach(btn => {
+    btn.addEventListener("click", () => {
+      btn.classList.toggle("liked");
+      const icon = btn.querySelector(".action-icon");
+      icon.style.transform = "scale(1.4)";
+      setTimeout(() => { icon.style.transform = ""; }, 200);
+    });
+  });
+
+  return section;
+}
+
+// ─── Progress dots ───────────────────────────────────
+
+function buildDots(count) {
+  dotsEl.innerHTML = "";
+  dots = [];
+
+  // Only show dots when there are ≤ 15 videos
+  if (count > 15) return;
+
+  for (let i = 0; i < count; i++) {
+    const d = document.createElement("div");
+    d.className = "dot" + (i === 0 ? " active" : "");
+    dotsEl.appendChild(d);
+    dots.push(d);
+  }
+}
+
+function setActiveDot(index) {
+  dots.forEach((d, i) => d.classList.toggle("active", i === index));
+}
+
+// ─── Scroll tracking ─────────────────────────────────
+
+const observer = new IntersectionObserver(
+  (entries) => {
+    for (const entry of entries) {
+      if (entry.isIntersecting) {
+        const idx = Number(entry.target.dataset.index);
+        currentIndex = idx;
+        setActiveDot(idx);
+      }
+    }
+  },
+  { threshold: 0.6 }
+);
+
+// ─── Load feed ───────────────────────────────────────
 
 async function loadFeed() {
+  screen.innerHTML = `
+    <div class="spinner"></div>
+    <span class="screen-label">Loading feed…</span>
+  `;
+  screen.classList.remove("hidden");
 
   try {
+    const res  = await fetch(WORKER + "/api/feed", { cache: "no-store" });
+    const data = await res.json();
 
-    const response =
-      await fetch(
-        WORKER + "/api/feed",
-        {
-          cache: "no-store"
-        }
-      );
-
-    const data =
-      await response.json();
-
-    console.log(
-      "Worker data:",
-      data
-    );
-
-    if (
-      !data.success ||
-      !Array.isArray(data.videos)
-    ) {
-      throw new Error(
-        "Invalid feed response."
-      );
-    }
-
-    if (data.videos.length === 0) {
-      throw new Error(
-        "No videos were returned."
-      );
+    if (!data.success || !Array.isArray(data.videos) || data.videos.length === 0) {
+      throw new Error(data.error || "No videos returned from worker.");
     }
 
     feed.innerHTML = "";
+    totalVideos = data.videos.length;
 
-    for (const video of data.videos) {
-      createVideo(video);
-    }
+    buildDots(totalVideos);
 
-    loading.classList.add("hidden");
+    data.videos.forEach((video, i) => {
+      const slide = buildSlide(video, i);
+      feed.appendChild(slide);
+      observer.observe(slide);
+    });
 
-  } catch (error) {
+    screen.classList.add("hidden");
 
-    console.error(error);
-
-    loading.innerHTML = `
-      <div class="error">
-        <b>Unable to load videos</b>
-        <br><br>
-        ${escapeHTML(error.message)}
-      </div>
+  } catch (err) {
+    console.error(err);
+    screen.innerHTML = `
+      <div class="error-icon">📡</div>
+      <div class="error-msg">${esc(err.message)}</div>
+      <button class="retry-btn" onclick="loadFeed()">Try again</button>
     `;
   }
 }
 
-
-function createVideo(video) {
-
-  const section =
-    document.createElement("section");
-
-  section.className = "video";
-
-  /*
-   * Use an iframe with the direct
-   * TikTok embed URL — far more
-   * reliable than the blockquote
-   * + embed.js widget approach.
-   */
-
-  if (video.embedLink) {
-
-    const iframe =
-      document.createElement("iframe");
-
-    iframe.className = "player";
-
-    iframe.src = video.embedLink;
-
-    iframe.setAttribute(
-      "allow",
-      "autoplay; clipboard-write; encrypted-media; picture-in-picture;"
-    );
-
-    iframe.setAttribute(
-      "allowfullscreen",
-      ""
-    );
-
-    iframe.setAttribute(
-      "loading",
-      "lazy"
-    );
-
-    section.appendChild(iframe);
-
-  } else {
-
-    /*
-     * Fallback: no embed available.
-     */
-
-    const fallback =
-      document.createElement("div");
-
-    fallback.style.cssText =
-      "color:#888; font-size:14px;";
-
-    fallback.textContent =
-      "Video unavailable";
-
-    section.appendChild(fallback);
-  }
-
-  /*
-   * Metadata overlay.
-   */
-
-  const info =
-    document.createElement("div");
-
-  info.className = "info";
-
-  info.innerHTML = `
-    <div class="creator">
-      @${escapeHTML(video.author || "Unknown")}
-    </div>
-    <div class="title">
-      ${escapeHTML(video.title || "")}
-    </div>
-  `;
-
-  section.appendChild(info);
-
-  feed.appendChild(section);
-}
-
-
-function escapeHTML(value) {
-
-  return String(value)
-    .replaceAll("&",  "&amp;")
-    .replaceAll("<",  "&lt;")
-    .replaceAll(">",  "&gt;")
-    .replaceAll('"',  "&quot;")
-    .replaceAll("'",  "&#039;");
-}
-
-
 loadFeed();
 
 </script>
-
 </body>
-
 </html>
